@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""五子棋 Web 应用。"""
+"""五子棋 Web 应用（无第三方依赖）。"""
 
-from flask import Flask, render_template_string, send_from_directory
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
-app = Flask(__name__)
+HOST = "0.0.0.0"
+PORT = 5000
 
-HTML_TEMPLATE = """
-<!doctype html>
+HTML_TEMPLATE = """<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -97,15 +98,35 @@ HTML_TEMPLATE = """
 """
 
 
-@app.route("/")
-def index():
-    return render_template_string(HTML_TEMPLATE)
+class GomokuHandler(BaseHTTPRequestHandler):
+    def do_GET(self):  # noqa: N802
+        if self.path in ("/", "/index.html"):
+            self._send_response(200, "text/html; charset=utf-8", HTML_TEMPLATE.encode("utf-8"))
+            return
+
+        if self.path == "/script.js":
+            script_path = Path(__file__).with_name("script.js")
+            if not script_path.exists():
+                self._send_response(404, "text/plain; charset=utf-8", b"script.js not found")
+                return
+            self._send_response(200, "application/javascript; charset=utf-8", script_path.read_bytes())
+            return
+
+        self._send_response(404, "text/plain; charset=utf-8", b"Not Found")
+
+    def _send_response(self, status_code, content_type, body):
+        self.send_response(status_code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
 
-@app.route("/script.js")
-def game_script():
-    return send_from_directory(".", "script.js", mimetype="application/javascript")
+def run_server(host=HOST, port=PORT):
+    httpd = HTTPServer((host, port), GomokuHandler)
+    print(f"Gomoku running at http://127.0.0.1:{port}")
+    httpd.serve_forever()
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    run_server()
