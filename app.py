@@ -84,8 +84,11 @@ HTML_TEMPLATE = """<!doctype html>
   <main class="container">
     <h1>五子棋</h1>
     <div class="toolbar">
-      <div id="status">当前回合：黑棋</div>
-      <button id="restart-btn" type="button">重新开始</button>
+      <div id="status">点击“开始对局”后由黑棋先手</div>
+      <div style="display:flex; gap:8px;">
+        <button id="start-btn" type="button">开始对局</button>
+        <button id="restart-btn" type="button">重新开始</button>
+      </div>
     </div>
     <div class="board-wrap">
       <canvas id="board" width="600" height="600" aria-label="五子棋棋盘"></canvas>

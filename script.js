@@ -3,24 +3,32 @@
   const canvas = document.getElementById('board');
   const ctx = canvas.getContext('2d');
   const statusEl = document.getElementById('status');
+  const startBtn = document.getElementById('start-btn');
   const restartBtn = document.getElementById('restart-btn');
 
   const padding = 30;
   const gridSize = (canvas.width - padding * 2) / (boardSize - 1);
 
   let board = createBoard();
-  let currentPlayer = 1; // 1:黑棋, 2:白棋
+  let currentPlayer = 1;
   let winner = null;
+  let gameStarted = false;
 
   function createBoard() {
     return Array.from({ length: boardSize }, () => Array(boardSize).fill(0));
   }
 
   function updateStatus() {
+    if (!gameStarted) {
+      statusEl.textContent = '点击“开始对局”后由黑棋先手';
+      return;
+    }
+
     if (winner) {
       statusEl.textContent = `游戏结束：${winner === 1 ? '黑棋' : '白棋'}获胜！`;
       return;
     }
+
     statusEl.textContent = `当前回合：${currentPlayer === 1 ? '黑棋' : '白棋'}`;
   }
 
@@ -60,17 +68,16 @@
 
         ctx.beginPath();
         ctx.arc(x, y, gridSize * 0.38, 0, Math.PI * 2);
+
+        const gradient = ctx.createRadialGradient(x - 4, y - 4, 2, x, y, gridSize * 0.38);
         if (board[row][col] === 1) {
-          const gradient = ctx.createRadialGradient(x - 4, y - 4, 2, x, y, gridSize * 0.38);
           gradient.addColorStop(0, '#666');
           gradient.addColorStop(1, '#111');
-          ctx.fillStyle = gradient;
         } else {
-          const gradient = ctx.createRadialGradient(x - 4, y - 4, 2, x, y, gridSize * 0.38);
           gradient.addColorStop(0, '#fff');
           gradient.addColorStop(1, '#ddd');
-          ctx.fillStyle = gradient;
         }
+        ctx.fillStyle = gradient;
         ctx.fill();
       }
     }
@@ -114,15 +121,17 @@
     ];
 
     return directions.some(([dr, dc]) => {
-      const total =
-        1 +
-        countInDirection(row, col, dr, dc, player) +
-        countInDirection(row, col, -dr, -dc, player);
+      const total = 1 + countInDirection(row, col, dr, dc, player) + countInDirection(row, col, -dr, -dc, player);
       return total >= 5;
     });
   }
 
   function handleClick(event) {
+    if (!gameStarted) {
+      statusEl.textContent = '请先点击“开始对局”';
+      return;
+    }
+
     if (winner) return;
 
     const pos = getGridPosition(event);
@@ -143,15 +152,30 @@
     updateStatus();
   }
 
+  function startGame() {
+    board = createBoard();
+    currentPlayer = 1;
+    winner = null;
+    gameStarted = true;
+    drawBoard();
+    updateStatus();
+  }
+
   function resetGame() {
     board = createBoard();
     currentPlayer = 1;
     winner = null;
     drawBoard();
-    updateStatus();
+
+    if (gameStarted) {
+      updateStatus();
+    } else {
+      statusEl.textContent = '点击“开始对局”后由黑棋先手';
+    }
   }
 
   canvas.addEventListener('click', handleClick);
+  startBtn.addEventListener('click', startGame);
   restartBtn.addEventListener('click', resetGame);
 
   resetGame();
