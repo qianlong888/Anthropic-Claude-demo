@@ -95,8 +95,12 @@ HTML_TEMPLATE = """<!doctype html>
       <canvas id="board" width="600" height="600" aria-label="五子棋棋盘"></canvas>
     </div>
     <p class="help">规则：黑棋先手，任意一方先形成连续五子即获胜。点击棋盘交叉点落子。</p>
+    <p class="help">若按钮无响应，请使用 http://127.0.0.1:5000 访问，不要直接打开本地文件预览。</p>
   </main>
-  <script src="/script.js?v=20260301"></script>
+  <script src="script.js?v=20260302"></script>
+  <noscript>
+    <p style="text-align:center;color:#b91c1c;font-size:14px;">页面需要 JavaScript 才能运行五子棋。</p>
+  </noscript>
 </body>
 </html>
 """
