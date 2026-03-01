@@ -3,6 +3,7 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 
 HOST = "0.0.0.0"
 PORT = 5000
@@ -103,11 +104,13 @@ HTML_TEMPLATE = """<!doctype html>
 
 class GomokuHandler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
-        if self.path in ("/", "/index.html"):
+        route = urlsplit(self.path).path
+
+        if route in ("/", "/index.html"):
             self._send_response(200, "text/html; charset=utf-8", HTML_TEMPLATE.encode("utf-8"))
             return
 
-        if self.path == "/script.js":
+        if route in ("/script.js", "script.js", "/script.js/"):
             script_path = Path(__file__).with_name("script.js")
             if not script_path.exists():
                 self._send_response(404, "text/plain; charset=utf-8", b"script.js not found")
