@@ -1,125 +1,200 @@
-/**
- * 前端JavaScript示例 - 包含常见问题供BugBot检测
- */
+(() => {
+  const boardSize = 15;
+  const padding = 30;
 
-// 潜在问题1: 全局变量污染
-var userData = {};
-var currentUser = null;
-var isLoggedIn = false;
+  function initGame() {
+    const canvas = document.getElementById('board');
+    const statusEl = document.getElementById('status');
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
 
-// 潜在问题2: 不安全的eval使用
-function executeUserCode(userInput) {
-    // 危险：直接执行用户输入
-    return eval(userInput);
-}
-
-// 潜在问题3: DOM XSS漏洞
-function displayMessage(message) {
-    // 直接插入HTML，可能导致XSS
-    document.getElementById('output').innerHTML = message;
-}
-
-// 潜在问题4: 缺少错误处理
-function fetchUserData(userId) {
-    fetch(`/api/users/${userId}`)
-        .then(response => response.json())
-        .then(data => {
-            // 没有错误处理
-            userData = data;
-            displayUserInfo(data);
-        });
-}
-
-// 潜在问题5: 内存泄露 - 未清理事件监听器
-function setupEventListeners() {
-    const button = document.getElementById('submit-btn');
-    button.addEventListener('click', function() {
-        console.log('Button clicked');
-    });
-    // 没有提供清理方法
-}
-
-// 潜在问题6: 竞态条件
-let requestCount = 0;
-function sendRequest() {
-    requestCount++;
-    
-    fetch('/api/data')
-        .then(response => response.json())
-        .then(data => {
-            // 可能出现竞态条件
-            if (requestCount === 1) {
-                processData(data);
-            }
-        });
-}
-
-// 潜在问题7: 不安全的随机数
-function generateSessionId() {
-    // Math.random()不够安全用于生成会话ID
-    return Math.random().toString(36).substr(2, 9);
-}
-
-// 潜在问题8: 原型污染风险
-function mergeObjects(target, source) {
-    for (let key in source) {
-        // 没有检查__proto__等危险属性
-        target[key] = source[key];
+    if (!canvas || !statusEl || !startBtn || !restartBtn) {
+      return;
     }
-    return target;
-}
 
-// 潜在问题9: 同步XMLHttpRequest（已废弃）
-function getUserDataSync(userId) {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', `/api/users/${userId}`, false); // 同步请求
-    xhr.send();
-    return JSON.parse(xhr.responseText);
-}
-
-// 潜在问题10: 无限递归的可能性
-function countdown(n) {
-    console.log(n);
-    if (n > 0) {
-        // 错误：应该是n-1
-        countdown(n);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      statusEl.textContent = '浏览器不支持 Canvas，无法开始游戏';
+      return;
     }
-}
 
-// 潜在问题11: 类型强制转换问题
-function compareValues(a, b) {
-    // 使用==而不是===，可能导致类型强制转换问题
-    if (a == b) {
-        return "equal";
+    const gridSize = (canvas.width - padding * 2) / (boardSize - 1);
+
+    let board = createBoard();
+    let currentPlayer = 1;
+    let winner = null;
+    let gameStarted = false;
+
+    function createBoard() {
+      return Array.from({ length: boardSize }, () => Array(boardSize).fill(0));
     }
-    return "not equal";
-}
 
-// 潜在问题12: 未验证的localStorage使用
-function saveUserPreferences(prefs) {
-    // 没有验证数据就直接存储
-    localStorage.setItem('userPrefs', JSON.stringify(prefs));
-}
+    function updateStatus(extra = '') {
+      if (!gameStarted) {
+        statusEl.textContent = '点击“开始对局”后由黑棋先手';
+        return;
+      }
 
-// 潜在问题13: 缺少CSRF保护的表单提交
-function submitForm(formData) {
-    fetch('/api/update-profile', {
-        method: 'POST',
-        body: JSON.stringify(formData),
-        headers: {
-            'Content-Type': 'application/json'
+      if (winner) {
+        statusEl.textContent = `游戏结束：${winner === 1 ? '黑棋' : '白棋'}获胜！`;
+        return;
+      }
+
+      const base = `当前回合：${currentPlayer === 1 ? '黑棋' : '白棋'}`;
+      statusEl.textContent = extra ? `${base}（${extra}）` : base;
+    }
+
+    function drawBoard() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#f7d794';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = '#8b5a2b';
+      ctx.lineWidth = 1;
+
+      for (let i = 0; i < boardSize; i += 1) {
+        const pos = padding + i * gridSize;
+
+        ctx.beginPath();
+        ctx.moveTo(padding, pos);
+        ctx.lineTo(canvas.width - padding, pos);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(pos, padding);
+        ctx.lineTo(pos, canvas.height - padding);
+        ctx.stroke();
+      }
+
+      drawPieces();
+    }
+
+    function drawPieces() {
+      for (let row = 0; row < boardSize; row += 1) {
+        for (let col = 0; col < boardSize; col += 1) {
+          if (board[row][col] === 0) continue;
+
+          const x = padding + col * gridSize;
+          const y = padding + row * gridSize;
+
+          ctx.beginPath();
+          ctx.arc(x, y, gridSize * 0.38, 0, Math.PI * 2);
+
+          const gradient = ctx.createRadialGradient(x - 4, y - 4, 2, x, y, gridSize * 0.38);
+          if (board[row][col] === 1) {
+            gradient.addColorStop(0, '#666');
+            gradient.addColorStop(1, '#111');
+          } else {
+            gradient.addColorStop(0, '#fff');
+            gradient.addColorStop(1, '#ddd');
+          }
+          ctx.fillStyle = gradient;
+          ctx.fill();
         }
-        // 缺少CSRF token
-    });
-}
-
-// 潜在问题14: 性能问题 - 在循环中查询DOM
-function updateList(items) {
-    const container = document.getElementById('list-container');
-    for (let i = 0; i < items.length; i++) {
-        // 每次循环都查询DOM
-        const listItem = document.createElement('li');
-        listItem.textContent = items[i];
-        document.getElementById('list-container').appendChild(listItem);
+      }
     }
-} 
+
+    function getGridPosition(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      const col = Math.round((x - padding) / gridSize);
+      const row = Math.round((y - padding) / gridSize);
+
+      if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) {
+        return null;
+      }
+
+      return { row, col };
+    }
+
+    function countInDirection(row, col, rowStep, colStep, player) {
+      let count = 0;
+      let r = row + rowStep;
+      let c = col + colStep;
+
+      while (r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === player) {
+        count += 1;
+        r += rowStep;
+        c += colStep;
+      }
+
+      return count;
+    }
+
+    function checkWin(row, col, player) {
+      const directions = [
+        [0, 1],
+        [1, 0],
+        [1, 1],
+        [1, -1],
+      ];
+
+      return directions.some(([dr, dc]) => {
+        const total = 1 + countInDirection(row, col, dr, dc, player) + countInDirection(row, col, -dr, -dc, player);
+        return total >= 5;
+      });
+    }
+
+    function handleCanvasClick(event) {
+      if (!gameStarted) {
+        statusEl.textContent = '请先点击“开始对局”';
+        return;
+      }
+
+      if (winner) return;
+
+      const pos = getGridPosition(event);
+      if (!pos) return;
+
+      const { row, col } = pos;
+      if (board[row][col] !== 0) return;
+
+      board[row][col] = currentPlayer;
+
+      if (checkWin(row, col, currentPlayer)) {
+        winner = currentPlayer;
+      } else {
+        currentPlayer = currentPlayer === 1 ? 2 : 1;
+      }
+
+      drawBoard();
+      updateStatus();
+    }
+
+    function startGame() {
+      board = createBoard();
+      currentPlayer = 1;
+      winner = null;
+      gameStarted = true;
+      drawBoard();
+      updateStatus('已开始');
+    }
+
+    function resetGame() {
+      board = createBoard();
+      currentPlayer = 1;
+      winner = null;
+      drawBoard();
+
+      if (gameStarted) {
+        updateStatus('已重置');
+      } else {
+        statusEl.textContent = '点击“开始对局”后由黑棋先手';
+      }
+    }
+
+    canvas.addEventListener('click', handleCanvasClick);
+    startBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', resetGame);
+
+    resetGame();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGame);
+  } else {
+    initGame();
+  }
+})();

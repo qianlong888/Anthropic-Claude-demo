@@ -1,91 +1,148 @@
 #!/usr/bin/env python3
+"""五子棋 Web 应用（无第三方依赖）。"""
+
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from urllib.parse import urlsplit
+
+HOST = "0.0.0.0"
+PORT = 5000
+
+HTML_TEMPLATE = """<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>五子棋</title>
+  <style>
+    :root {
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #1f2937;
+      background: #f6f7fb;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .container {
+      width: min(92vw, 680px);
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+    }
+    h1 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    #status {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    button {
+      border: none;
+      background: #2563eb;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover { background: #1e4fbb; }
+    .board-wrap {
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #fdf8ea;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #f7d794;
+    }
+    .help {
+      margin-top: 12px;
+      color: #6b7280;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>五子棋</h1>
+    <div class="toolbar">
+      <div id="status">点击“开始对局”后由黑棋先手</div>
+      <div style="display:flex; gap:8px;">
+        <button id="start-btn" type="button">开始对局</button>
+        <button id="restart-btn" type="button">重新开始</button>
+      </div>
+    </div>
+    <div class="board-wrap">
+      <canvas id="board" width="600" height="600" aria-label="五子棋棋盘"></canvas>
+    </div>
+    <p class="help">规则：黑棋先手，任意一方先形成连续五子即获胜。点击棋盘交叉点落子。</p>
+    <p class="help">若按钮无响应，请使用 http://127.0.0.1:5000 访问，不要直接打开本地文件预览。</p>
+  </main>
+  <script src="script.js?v=20260302"></script>
+  <noscript>
+    <p style="text-align:center;color:#b91c1c;font-size:14px;">页面需要 JavaScript 才能运行五子棋。</p>
+  </noscript>
+</body>
+</html>
 """
-示例Web应用 - 包含一些常见的编程问题供BugBot检测
-"""
 
-import os
-import sqlite3
-from flask import Flask, request, render_template_string
 
-app = Flask(__name__)
+class GomokuHandler(BaseHTTPRequestHandler):
+    def do_GET(self):  # noqa: N802
+        route = urlsplit(self.path).path
 
-# 潜在问题1: 硬编码的敏感信息
-SECRET_KEY = "super_secret_key_123"
-DATABASE_PASSWORD = "admin123"
+        if route in ("/", "/index.html"):
+            self._send_response(200, "text/html; charset=utf-8", HTML_TEMPLATE.encode("utf-8"))
+            return
 
-# 潜在问题2: SQL注入漏洞
-def get_user_data(user_id):
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    # 危险：直接拼接SQL查询
-    query = f"SELECT * FROM users WHERE id = {user_id}"
-    cursor.execute(query)
-    result = cursor.fetchall()
-    conn.close()
-    return result
+        if route in ("/script.js", "script.js", "/script.js/"):
+            script_path = Path(__file__).with_name("script.js")
+            if not script_path.exists():
+                self._send_response(404, "text/plain; charset=utf-8", b"script.js not found")
+                return
+            self._send_response(200, "application/javascript; charset=utf-8", script_path.read_bytes())
+            return
 
-# 潜在问题3: 未验证的用户输入
-@app.route('/user/<user_id>')
-def show_user(user_id):
-    # 没有输入验证
-    user_data = get_user_data(user_id)
-    return f"User data: {user_data}"
+        self._send_response(404, "text/plain; charset=utf-8", b"Not Found")
 
-# 潜在问题4: XSS漏洞
-@app.route('/search')
-def search():
-    query = request.args.get('q', '')
-    # 直接渲染用户输入，可能导致XSS
-    template = f"""
-    <html>
-        <body>
-            <h1>搜索结果</h1>
-            <p>你搜索了: {query}</p>
-        </body>
-    </html>
-    """
-    return render_template_string(template)
+    def _send_response(self, status_code, content_type, body, extra_headers=None):
+        self.send_response(status_code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        if extra_headers:
+            for key, value in extra_headers.items():
+                self.send_header(key, value)
+        self.end_headers()
+        self.wfile.write(body)
 
-# 潜在问题5: 资源泄露
-def process_file(filename):
-    try:
-        file = open(filename, 'r')
-        content = file.read()
-        # 忘记关闭文件
-        return content.upper()
-    except:
-        # 空的异常处理
-        pass
 
-# 潜在问题6: 无限循环的可能性
-def calculate_factorial(n):
-    result = 1
-    while n > 0:
-        result *= n
-        # 忘记递减n，可能导致无限循环
-        # n -= 1  # 这行被注释了
-    return result
+def run_server(host=HOST, port=PORT):
+    httpd = HTTPServer((host, port), GomokuHandler)
+    print(f"Gomoku running at http://127.0.0.1:{port}")
+    httpd.serve_forever()
 
-# 潜在问题7: 类型错误
-def divide_numbers(a, b):
-    # 没有检查除零错误
-    return a / b
 
-# 潜在问题8: 不安全的随机数生成
-import random
-def generate_token():
-    # 使用不安全的伪随机数生成器
-    return str(random.randint(100000, 999999))
-
-# 潜在问题9: 内存效率问题
-def process_large_list():
-    # 创建不必要的大列表
-    numbers = list(range(1000000))
-    squared = []
-    for num in numbers:
-        squared.append(num * num)
-    return squared
-
-if __name__ == '__main__':
-    # 潜在问题10: 在生产环境中使用debug模式
-    app.run(debug=True, host='0.0.0.0') 
+if __name__ == "__main__":
+    run_server()
