@@ -96,7 +96,7 @@ HTML_TEMPLATE = """<!doctype html>
     </div>
     <p class="help">规则：黑棋先手，任意一方先形成连续五子即获胜。点击棋盘交叉点落子。</p>
   </main>
-  <script src="/script.js"></script>
+  <script src="/script.js?v=20260301"></script>
 </body>
 </html>
 """
@@ -120,10 +120,16 @@ class GomokuHandler(BaseHTTPRequestHandler):
 
         self._send_response(404, "text/plain; charset=utf-8", b"Not Found")
 
-    def _send_response(self, status_code, content_type, body):
+    def _send_response(self, status_code, content_type, body, extra_headers=None):
         self.send_response(status_code)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        if extra_headers:
+            for key, value in extra_headers.items():
+                self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
 
